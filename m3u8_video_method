@@ -56,7 +56,16 @@ for video_url in queue:
     
     r = requests.get(video_url)
     playlist = r.text
-    segment_urls = [line.strip() for line in playlist.split("\n") if ".ts" in line] #not perfect, but different websites have different segment links so its the best i could do
+    segment_urls = []
+    lines = playlist.split("\n")
+    for line in lines:
+        if ".ts" in line:
+            line = line.strip()
+            if "https" not in line:
+                url_soup = video_url.split("/")
+                url_soup.pop()
+                line = "/".join(url_soup) + "/" + line
+            segment_urls.append(line)
     
     num_segments = len(segment_urls)
 
