@@ -95,12 +95,14 @@ for video_url in queue:
         #        with open(segment_file, "rb") as s:
         #            shutil.copyfileobj(s, f)
         segment_register = []
-        for i, segment_url in enumerate(segment_urls):
+        for i, d in enumerate(segment_urls):
             segment_file = output_dir + f"{i:04d}.ts"
             segment_register.append(segment_file)
-        command = ['ffmpeg', '-i', 'concat:' + '|'.join(segment_register), '-c', 'copy', output_file_path]
-        open_process = subprocess.Popen(command)
-        open_process.wait()
+        for i in range(0, len(segment_register), 100): #prevent windows error by spliiting into chunks
+            chunk = segment_register[i:i+chunk_size]
+            command = ['ffmpeg', '-i', 'concat:' + '|'.join(chunk), '-c', 'copy', output_file_path]
+            open_process = subprocess.Popen(command)
+            open_process.wait()
     except Exception as e:
         print(e)
         input()
