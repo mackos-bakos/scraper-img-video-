@@ -8,7 +8,6 @@ import threading
 import subprocess
 import ffmpeg
 import tempfile
-from moviepy.editor import VideoFileClip, concatenate_videoclips
 file = open("queue.txt", "r")
 queue = file.read().split("\n")
 file.close()
@@ -57,8 +56,7 @@ for video_url in queue:
     
     r = requests.get(video_url)
     playlist = r.text
-    
-    segment_urls = [line.strip() for line in playlist.split("\n") if ".ts" in line and "https" in line] #not perfect, but different websites have different segment links so its the best i could do
+    segment_urls = [line.strip() for line in playlist.split("\n") if ".ts" in line] #not perfect, but different websites have different segment links so its the best i could do
     
     num_segments = len(segment_urls)
 
@@ -94,7 +92,7 @@ for video_url in queue:
         #        segment_file = output_dir + f"{i:04d}.ts"
         #        with open(segment_file, "rb") as s:
         #            shutil.copyfileobj(s, f)
-        if len(segment_urls) > 1000: #slow method, looking for a better method
+        if len(segment_urls) > 1200: #slow method, looking for a better method
             segment_register = []
             for i, segment_url in enumerate(segment_urls):
                 segment_file = output_dir + f"{i:04d}.ts"
@@ -105,15 +103,18 @@ for video_url in queue:
 
             output_chunks = []
             for chunk in segment_chunks:
-                output_chunk = f"{chunk[0]}_output.mp4"
+                output_chunk = f"{chunk[0]}_output.ts"
                 command = ['ffmpeg', '-i', 'concat:' + '|'.join(chunk), '-c', 'copy', output_chunk]
                 open_process = subprocess.Popen(command)
                 open_process.wait()
                 output_chunks.append(output_chunk)
-
-            video_clips = [VideoFileClip(file_name) for file_name in output_chunks]
-            final_clip = concatenate_videoclips(video_clips)
-            final_clip.write_videofile(output_file)
+                
+            command = ['ffmpeg', '-i', 'concat:' + '|'.join(output_chunks), '-c', 'copy', output_file]
+            open_process = subprocess.Popen(command)
+            open_process.wait()
+            #video_clips = [VideoFileClip(file_name) for file_name in output_chunks]
+            #final_clip = concatenate_videoclips(video_clips)
+            #final_clip.write_videofile(output_file)
             
         else: #very fast
             segment_register = []
