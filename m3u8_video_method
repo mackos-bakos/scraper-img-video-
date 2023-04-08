@@ -1,0 +1,120 @@
+import requests
+import shutil
+import os
+import random
+import sys
+import math
+import threading
+import subprocess
+
+queue = []
+print("keep entering urls, to stop adding to the queue enter stop")
+while True:
+    inp = input("enter .m3u8 link to stream //:")
+    if (inp == "stop"):
+        break
+    queue.append(inp)
+
+
+output_dir = os.getcwd() + "/segments/"
+
+if not os.path.exists(output_dir):
+    os.mkdir(output_dir)
+
+def progress_bar(percent=0, width=30):
+    """display a updating progress bar with static position in cmd prompt"""
+    left = width * percent // 100
+    right = width - left
+    print('\r[', '#' * left, ' ' * right, ']',
+        f' {percent:.0f}%',
+        sep='', end='', flush=True)
+    
+def overwrite_data(file):
+    """write a file with random bytemaps to prevent data recovery"""
+    for i in range(5):
+        with open(file, 'wb') as f:
+            f.write(os.urandom(os.path.getsize(file)))
+
+            f.close()
+
+def copy_file_to(source,destination):
+    """copy the bytemap of a file elsewhere"""
+    with open(source, 'rb') as read_file:
+        with open(destination, 'wb') as write_file:
+
+            for line in read_file:
+                write_file.write(line)
+                
+
+            write_file.close()
+            
+
+        read_file.close()
+for video_url in queue:
+    output_file = ''.join(chr(random.randint(128, 512)) for _ in range(7)) + ".mp4"
+
+    output_file_path = os.path.join(os.getcwd(),output_file)
+    
+    r = requests.get(video_url)
+    playlist = r.text
+    
+    segment_urls = [line.strip() for line in playlist.split("\n") if ".ts" in line and "https" in line] #not perfect, but different websites have different segment links so its the best i could do
+    
+    num_segments = len(segment_urls)
+
+    exisiting_segments = []
+    for existing in os.listdir(output_dir):
+        exisiting_segments.append(existing[:4])
+    should_resume = False
+    if exisiting_segments:
+        if input(f"resume at {max(exisiting_segments)}? y/n //:").lower() == "y":
+            should_resume = True
+    print("downloading segments")
+    try:
+        for i, segment_url in enumerate(segment_urls):
+            if (f"{i:04d}" in exisiting_segments) and should_resume:
+                progress_bar(math.ceil(i/num_segments * 100))
+                continue
+            segment_file = output_dir + f"{i:04d}.ts"
+            r = requests.get(segment_url, stream=True)
+            with open(segment_file, "wb") as f:
+                shutil.copyfileobj(r.raw, f)
+            del r
+            progress_bar(math.ceil(i/num_segments * 100))
+    
+    except Exception as e:
+        print(e)
+        input()
+
+    print("\nappending segments to mp4 format...",end="")
+    try:
+        # RETIRED METHOD
+        #with open(output_file, "wb") as f:
+        #    for i, segment_url in enumerate(segment_urls):
+        #        segment_file = output_dir + f"{i:04d}.ts"
+        #        with open(segment_file, "rb") as s:
+        #            shutil.copyfileobj(s, f)
+        segment_register = []
+        for i, segment_url in enumerate(segment_urls):
+            segment_file = output_dir + f"{i:04d}.ts"
+            segment_register.append(segment_file)
+        command = ['ffmpeg', '-i', 'concat:' + '|'.join(segment_register), '-c', 'copy', output_file_path]
+        open_process = subprocess.Popen(command)
+        open_process.wait()
+    except Exception as e:
+        print(e)
+        input()
+    print("ffmpeg finished creating mp4 files")
+
+    print("cleaning up segment files...",end="")
+    try:
+        for ts_file in os.listdir(output_dir):
+            if ts_file.endswith(".ts"):
+                ts_path = os.path.join(output_dir, ts_file)
+                overwrite_data(ts_path)
+                os.remove(ts_path)
+    except Exception as e:
+        print(e)
+        input()
+    print(" done")
+input()
