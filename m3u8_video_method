@@ -4,22 +4,26 @@ import os
 import random
 import sys
 import math
-import threading
 import subprocess
 import ffmpeg
-import tempfile
 file = open("queue.txt", "r")
 queue = file.read().split("\n")
+to_write = queue.copy()
 file.close()
+session = requests.Session()
+session.headers.update({'Accept-Encoding': 'gzip'})
 if not queue:
     print("no files in queue, please add them to queue.txt seperated by a new line")
     sys. exit()
     
 output_dir = os.getcwd() + "/segments/"
+video_output_dir = os.getcwd() + "/output/"
 
 if not os.path.exists(output_dir):
     os.mkdir(output_dir)
-
+if not os.path.exists(video_output_dir):
+    os.mkdir(video_output_dir)
+    
 def progress_bar(percent=0, width=30):
     """display a updating progress bar with static position in cmd prompt"""
     left = width * percent // 100
@@ -35,24 +39,10 @@ def overwrite_data(file):
             f.write(os.urandom(os.path.getsize(file)))
 
             f.close()
-
-def copy_file_to(source,destination):
-    """copy the bytemap of a file elsewhere"""
-    with open(source, 'rb') as read_file:
-        with open(destination, 'wb') as write_file:
-
-            for line in read_file:
-                write_file.write(line)
-                
-
-            write_file.close()
-            
-
-        read_file.close()
 for video_url in queue:
     output_file = ''.join(chr(random.randint(128, 512)) for _ in range(7)) + ".mp4"
 
-    output_file_path = os.path.join(os.getcwd(),output_file)
+    output_file_path = video_output_dir + output_file
     
     r = requests.get(video_url)
     playlist = r.text
@@ -63,8 +53,8 @@ for video_url in queue:
             line = line.strip()
             if "https" not in line:
                 url_soup = video_url.split("/")
-                url_soup.pop()
-                line = "/".join(url_soup) + "/" + line
+                url_soup.pop() #remove end url
+                line = "/".join(url_soup) + "/" + line #add base url to packet id
             segment_urls.append(line)
     
     num_segments = len(segment_urls)
@@ -83,12 +73,11 @@ for video_url in queue:
                 progress_bar(math.ceil(i/num_segments * 100))
                 continue
             segment_file = output_dir + f"{i:04d}.ts"
-            r = requests.get(segment_url, stream=True)
+            r = session.get(segment_url, stream=True)
             with open(segment_file, "wb") as f:
                 shutil.copyfileobj(r.raw, f)
             del r
             progress_bar(math.ceil(i/num_segments * 100))
-    
     except Exception as e:
         print(e)
         input()
@@ -145,6 +134,17 @@ for video_url in queue:
                 ts_path = os.path.join(output_dir, ts_file)
                 overwrite_data(ts_path)
                 os.remove(ts_path)
+    except Exception as e:
+        print(e)
+        input()
+    print(" done")
+
+    print(f"removing {video_url} from queue...",end = "")
+    try:
+        with open("queue.txt", "w") as q:
+            to_write.remove(video_url)
+            q.write('\n'.join(to_write))
+            q.close()
     except Exception as e:
         print(e)
         input()
