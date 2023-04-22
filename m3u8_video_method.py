@@ -6,7 +6,7 @@ import sys
 import math
 import subprocess
 import ffmpeg
-import tqdm
+from tqdm import tqdm
 def overwrite_data(file):
     """write a file with random bytemaps to prevent data recovery"""
     with open(file, 'wb') as f:
@@ -131,7 +131,7 @@ if __name__ == "__main__":
             if input(f"resume at {max(exisiting_segments)}? y/n //:").lower() == "y":
                 should_resume = True
         print("downloading segments")
-        download_segs(segment_urls,output_dir,existing,should_resume)
+        download_segs(segment_urls,output_dir,exisiting_segments,should_resume)
         print("\nappending segments to mp4 format...",end="")
         compile_mp4(segment_urls,output_file_path)
         print("ffmpeg finished creating mp4 files")
